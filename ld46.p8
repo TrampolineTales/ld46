@@ -32,22 +32,20 @@ end
 --main logic loop
 
 combo_offset=0
-start_timer=180
-go_timer=30
-shop_timer=660
+shop_timer=720
+shop_timer_max=720
+shop_counter=100
+about_to_shop=false
 
 function game_loop()
 	draw_world()
 	
-	if shopping then
-		shop_menu()
-	elseif start_timer<=0 then
-		go_timer-=1
+	if about_to_shop then
+		shop_counter-=1
+	else
 		if shop_timer<=0 then
-			shopping=true
-			shop_anim=8
+			about_to_shop=true
 		end
-		
 		if hit_timer<=8 then
 			if homing_dashing then
 				homing_dash()
@@ -58,35 +56,63 @@ function game_loop()
 		end
 		
 		hit_friend()
-	else
-		draw_text("gET rEADY...",64-#"gET rEADY..."*2,62,0,7)
-		time_str="0:0"..flr(start_timer/60).."."
-		if start_timer%60<10 then
-			time_str=time_str.."0"
-		end
-		time_str=time_str..start_timer%60
-		draw_text(time_str,64-#time_str*2,69,0,7)
-		start_timer-=1
-		line(60-char_x+friend_x+2,friend_y+96-char_y-12,64-char_x+friend_x,friend_y+96-char_y,7)
-		spr(8,60-char_x+friend_x,friend_y+96-char_y-12)
-		friend_y-=0.5
 	end
 	
 	draw_friend()
 	draw_character()
 	
-	if start_timer<=0 then
-		draw_target()
+	if shop_timer<0 then
+		shop_timer=0
 	end
 	
+	if shop_counter<=0 then
+		screen="shop"
+		shop_times+=1
+		if shop_times>#shop_lines then
+			shop_times=0
+		end
+		sfx(0)
+	end
+	
+	time_str=flr(shop_timer/3600)..":"
+	
+	if flr(shop_timer/60)%60<10 then
+		time_str=time_str.."0"
+	end
+	
+	time_str=time_str..(flr(shop_timer/60)%60).."."..flr(shop_timer%60/6)
+	
+	if about_to_shop then
+		shop_open_text="tHE SHOP\nIS ABOUT\nTO OPEN!"
+	else
+		shop_open_text="tHE SHOP\nOPENS IN\n "..time_str
+	end
+	
+	if shop_counter%3==0 then
+		text_color=9
+	else
+		text_color=7
+	end
+	
+	draw_text(shop_open_text,2,106-combo_offset,0,text_color)
+	if hit_timer>=1 and shop_counter==100 then
+		draw_text("-"..flr(shop_timer_decrease/60)..'SEC',7,98-combo_offset,0,text_color)
+	end
+	
+	if hit_timer==0 and not friend_floating and not about_t0_shop then
+		shop_timer-=1
+	end
+	draw_target()
+
 	draw_combo()
 	
-	if go_timer>=0 and start_timer<=0 then
+	--[[if go_timer>=0 and not starting then
 		if go_timer==30 then
+			sfx(7)
 			friend_delta_y=0.5
 		end
 		draw_text("go!",60,62,0,7)
-	end
+	end]]--
 end
 
 function draw_text(s,x,y,c1,c2)
@@ -98,21 +124,21 @@ end
 
 function draw_combo_sprite(s,x,y)
 	for i=1,9 do
-		spr(s+32,x-1+i%3,y-1+flr((i-1)/3))
+		spr(s,x-1+i%3,y-1+flr((i-1)/3))
 		if s!=58 then
-			spr(s+48,x-1+i%3,y-1+flr((i-1)/3)+8)
+			spr(s+16,x-1+i%3,y-1+flr((i-1)/3)+8)
 		end
 	end
-	spr(s,x,y)
-	spr(s+16,x,y+8)
+	spr(s+32,x,y)
+	spr(s+48,x,y+8)
 end
 
 function draw_combo()
 	if combo>0 then
 		for n=0,#tostr(combo)-1 do
-			draw_combo_sprite((41+flr(combo/10^n)%10)-flr((((combo/10^n)%10)+9)/10)*10,108-n*10,20-combo_offset)
+			draw_combo_sprite((41+flr(combo/10^n)%10)-flr((((combo/10^n)%10)+9)/10)*10,108-n*10,106-combo_offset)
 		end
-		draw_combo_sprite(58,118,28-combo_offset,9,10)
+		draw_combo_sprite(58,118,114-combo_offset,9,10)
 	end
 	
 	if combo_offset>0 then
@@ -130,44 +156,47 @@ flip_char=false
 bounce_cycle=1
 walk_cycle=0
 walk_mod=1
-homing_range=60
+homing_range=0
 homing_dash_max_cooldown=180
 homing_dash_cooldown=180
 homing_dashing=false
 homing_dash_frames=5
+homing_dash_unlocked=false
+dash_unlocked=false
 dash_max_cooldown=120
 dash_cooldown=120
 dashing=false
-dash_speed=2.35
+dash_speed=0
 jumps=1
 max_jumps=1
 jump_delay=2
 combo=0
+run_speed=0
+jump_height=0
+shop_timer_decrease=60
+combo_multiplier=1
+combo_bonus=1
 
 function move_char()
 	if btn(➡️) then
 		if char_delta_x==0 then
-			char_delta_x=0.6
+			char_delta_x=0.6+run_speed
 		end
 		if char_delta_x<1 then
 			char_delta_x+=0.04
 		end
-		bounce_cycle+=1
 	elseif btn(⬅️) then
 		if char_delta_x==0 then
-			char_delta_x=-0.6
+			char_delta_x=-0.6-run_speed
 		end
 		if char_delta_x>-1 then
 			char_delta_x-=0.04
 		end
-		bounce_cycle+=1
 	else
-		walk_cycle=0
-		bounce_cycle=1
 		if char_delta_x<0 then
-			char_delta_x+=0.04
+			char_delta_x+=0.025
 		elseif char_delta_x>0 then
-			char_delta_x-=0.04
+			char_delta_x-=0.025
 		end
 		
 		if char_delta_x<=0.05 and char_delta_x>=-0.05 then
@@ -179,7 +208,14 @@ function move_char()
 		end
 	end
 	
-	if char_x>=friend_x+5 then
+	if char_delta_x!=0 then
+		bounce_cycle+=1
+	else
+		walk_cycle=0
+		bounce_cycle=1
+	end
+	
+	if char_x>=friend_x+4 then
 		flip_char=true
 	else
 		flip_char=false
@@ -196,7 +232,7 @@ function move_char()
 		dash_cooldown+=1
 	end
 	
-	if btn(🅾️) and sqrt(((friend_x-char_x)/8)^2+((friend_y-char_y)/8)^2)*8<=homing_range
+	if btn(❎) and sqrt(((friend_x-char_x)/8)^2+((friend_y-char_y)/8)^2)*8<=homing_range
 	and homing_dash_cooldown>=homing_dash_max_cooldown
 	and char_y>=96 then
 		sfx(4)
@@ -207,7 +243,7 @@ function move_char()
 		dash_start_y=char_y
 	end
 	
-	if btnp(❎) and jumps>0 and jump_delay<=0 then
+	if btnp(🅾️) and jumps>0 and jump_delay<=0 then
 		jumps-=1
 		jump()
 	elseif char_y>=96 then
@@ -277,6 +313,8 @@ function dash()
 end
 
 function jump()
+	print(jump_height,2,2,11)
+	char_y-=jump_height
 	char_delta_y=-1.95
 	jump_delay=2
 	sfx(1)
@@ -291,12 +329,30 @@ end
 -->8
 --friend logic
 
-friend_x=84
-friend_y=86
+friend_x=81
+friend_y=82.5
 friend_delta_x=0
 friend_delta_y=0
+friend_floating=true
 flip_friend=false
 hit_timer=0
+bounces=0
+float_mod=-1
+lives=1
+hit_power=0
+
+function float_friend()
+	line(60-char_x+friend_x+2,friend_y+96-char_y-12,64-char_x+friend_x,friend_y+96-char_y,7)
+	line(60-char_x+friend_x+14,friend_y+96-char_y-12,64-char_x+friend_x+8,friend_y+96-char_y+1,7)
+	spr(8,60-char_x+friend_x,friend_y+96-char_y-12)
+	spr(8,70-char_x+friend_x,friend_y+96-char_y-12)
+
+	if friend_delta_y<-0.15 or friend_delta_y>=0.15 then
+		float_mod*=-1
+	end
+	
+	friend_delta_y+=0.005*float_mod
+end
 
 function draw_friend()
 	if friend_y+96-char_y<=-8 then
@@ -308,6 +364,10 @@ function draw_friend()
 		end
 		spr(42,x,1)
 		draw_text(-flr(friend_y+96-char_y+8).."PX",x,6,10,9)
+	elseif 76-char_x+friend_x<=0 then
+		spr(43,2,friend_y+96-char_y)
+	elseif 60-char_x+friend_x>=128 then
+		spr(43,118,friend_y+96-char_y,1,1,true)
 	end
 
 	spr(1,60-char_x+friend_x,friend_y+96-char_y)
@@ -315,19 +375,24 @@ function draw_friend()
 end
 
 function move_friend()
-	if friend_delta_y<4 then
-		friend_delta_y+=0.0375
-	end
-	
-	if combo>0 then
-		if friend_delta_x<0.25 then
-				friend_delta_x+=0.04
-		elseif friend_delta_x>0.25 then
-			friend_delta_x-=0.04
+	if friend_floating then
+		float_friend()
+	else
+		float_timer=0
+		if friend_delta_y<4 then
+			friend_delta_y+=0.0375
 		end
 		
-		if friend_delta_x<=0.25 and friend_delta_x>=-0.25 then
-			friend_delta_x=0
+		if combo>0 and bounces==0 then
+			if friend_delta_x<0 then
+					friend_delta_x+=0.04
+			elseif friend_delta_x>0 then
+				friend_delta_x-=0.04
+			end
+			
+			if friend_delta_x<=0.25 and friend_delta_x>=-0.25 and bounces==0 then
+				friend_delta_x=0
+			end
 		end
 	end
 
@@ -335,40 +400,62 @@ function move_friend()
 	friend_y+=friend_delta_y
 	
 	if friend_y>=96 then
-		combo=0
-		friend_y=96
+		if lives>1 then
+			lives-=1
+			screen="lives"
+		else
+			screen="gameover"
+			f=0
+		end
 	end
 end
 
 function hit_friend()
+	combo_mod=combo/10
+	if combo_mod>1.8 then
+		combo_mod=1.8
+	end
+	
 	if hit_timer==0
 	and char_x+8.5>=friend_x
 	and char_x<=friend_x+14.5
 	and char_y+8.5>=friend_y
 	and char_y<=friend_y+8.5 then
-		combo_mod=combo/10
-		if combo_mod>2 then
-			combo_mod=2
-		end
-
-		sfx(5)
-		if char_delta_x<1 then
-			friend_delta_x=1+combo_mod
-			if flip_char then
-				friend_delta_x*=-1
+		if (dashing or homing_dashing or char_y<96) then
+			friend_floating=false
+			sfx(5)
+			if char_delta_x<1 then
+				friend_delta_x=1+combo_mod
+				if flip_char then
+					friend_delta_x*=-1
+				end
+			elseif char_delta_x>2 then
+				friend_delta_x=2+combo_mod
+			else
+				friend_delta_x=char_delta_x+combo_mod
 			end
-		elseif char_delta_x>2 then
-			friend_delta_x=2+combo_mod
+			friend_delta_y=-1.5-combo_mod-hit_power
+			char_delta_x=0
+			char_delta_y=0.2
+			hit_timer=24
+			combo+=1
+			combo_offset+=2
+			homing_dashing=false
+			bounces=0
+			shop_timer-=shop_timer_decrease
 		else
-			friend_delta_x=char_delta_x+combo_mod
+			bounces+=1
+			friend_delta_x=-(char_x-friend_x-4)*0.025
+			if friend_delta_x<0 then
+				friend_delta_x-=combo_mod
+			else
+				friend_delta_x+=combo_mod
+			end
+			if abs(friend_delta_x)<=0.025 then
+				friend_delta_x=0.025
+			end
+			friend_delta_y=-0.6-bounces*0.025
 		end
-		friend_delta_y=-1.5-combo_mod
-		char_delta_x=0
-		char_delta_y=0.2
-		hit_timer=24
-		combo+=1
-		combo_offset+=2
-		homing_dashing=false
 	end
 	
 	if hit_timer>0 then
@@ -377,6 +464,7 @@ function hit_friend()
 		else
 			pal()
 		end
+		draw_text("SQUEAK!",56-char_x+friend_x,friend_y+96-char_y-6,2,13)
 		hit_timer-=1
 	end
 end
@@ -400,58 +488,204 @@ end
 -->8
 --shop logic
 
-shopping=false
-almost_done=false
-can_shop=true
-shop_anim=10
-animate_out=false
+items_a={{"hOMING DASH",5,0,""},{"mOUSE WEIGHT",5,1,"OZ"},{"rUN sPEED",10,1,"PX/SEC"}}
+items_b={{"bONUS LIFE",20,1,"UP"},{"eXTRA JUMP",40,1,"JUMP"},{"jUMP HEIGHT",3,2,"PX"}}
+items_c={{"cOMBO mULTIPLIER",20,2,"X"},{"cOMBO BONUS",25,1,"X/HIT"},{"lIFT CURSE",300,0,""},{"lEAVE SHOP",0,0,""}}
+items={items_a,items_b,items_c}
+shop_lines={"pRESS z TO BUY\nSOMETHING, WILL YA?","i HEARD THAT THE MORE\nCOMBO YOU HAVE, THE\nFURTHER YOU'LL HIT\nYOUR MOUSE FRIEND..."}
+item_x=1
+item_y=1
+shop_times=0
+shoplifter=false
+murderer=false
 
-items={{"lOCK-ON rADIUS",3,10,"PX"},{"dASH sPEED",4,5,"%"},{"rUN sPEED",2,1,"PX/SEC"}}
-item_pos=1
+function shop_loop()
+	cls(4)
+	draw_combo()
+	if btnp(➡️) then
+		if item_y!=4 then
+			item_x+=1
+		else
+			item_x=1
+			item_y=3
+		end
+		shoplifter=false
+		murderer=false
+	elseif btnp(⬅️) then
+		if item_y!=4 then
+			item_x-=1
+		else
+			item_x=2
+			item_y=3
+		end
+		shoplifter=false
+		murderer=false
+	end
+	
+	if btnp(⬆️) then
+		item_y-=1
+		shoplifter=false
+		murderer=false
+	elseif btnp(⬇️) then
+		item_y+=1
+		shoplifter=false
+		murderer=false
+	end
+	
+	if item_x<1 then
+		item_x=3
+	elseif item_x>3 then
+		item_x=1
+	end
+	
+	if item_y<1 then
+		item_y=#items[item_x]
+	elseif item_y>#items[item_x] and item_x==3 then
+		item_y=1
+	elseif item_y>#items[item_x] then
+		item_x=3
+		item_y=4
+	end
+	
+	if btnp(🅾️) then
+		if combo>items[item_x][item_y][2] then
+			buy_thing()
+		elseif combo==items[item_x][item_y][2] then
+			sfx(2)
+			murderer=true
+		else
+			sfx(2)
+		 shoplifter=true
+		end
+	end
+	
+	for x=1,3 do
+		for y=1,#items[x] do
+			if item_x==x and item_y==y then
+				fill_color=9
+				outline_color=10
+				offset=-sub_timer
+			else
+				fill_color=0
+				outline_color=7
+				offset=0
+			end
+			if x==3 and y==4 then
+				draw_text("free!",22-#"free!"*2+(x-1)*42,-8+y*26+offset,fill_color,11)
+			end
+			lines={}
+			last_space=0
+			for i=1,#items[x][y][1] do
+				if sub(items[x][y][1],i,i)==" " then
+					add(lines,sub(items[x][y][1],last_space,i-1))
+					last_space=i+1
+				elseif	i==#items[x][y][1] then
+					add(lines,sub(items[x][y][1],last_space,i))
+				end
+			end
+			
+			if x==3 and y==4 then
+				offset-=4
+			end
+			
+			for i=1,#lines do
+				draw_text(lines[i],22-#lines[i]*2+(x-1)*42,-22+y*26+i*6+offset,fill_color,outline_color)
+			end
+			
+			str2="-"..items[x][y][2].."X"
+			if x==1 and y==2 then
+				str3="-"
+			else
+				str3="+"
+			end
+			
+			str3=str3..flr(items[x][y][3])..sub(items[x][y][3]%1,2,3)..items[x][y][4]
+			if (x!=3 or y!=4) then
+				if x!=3 or y!=3 then
+					if (x==1 and y==1 and not homing_dash_unlocked) then
+						draw_text(str2,22-#str2*2+(x-1)*42,-4+y*26+offset,fill_color,8)
+					else
+						draw_text(str2,22-#str2*2+(x-1)*42,2+y*26+offset,fill_color,8)
+						draw_text(str3,22-#str3*2+(x-1)*42,-4+y*26+offset,fill_color,11)
+					end
+				else
+					draw_text(str2,22-#str2*2+(x-1)*42,-4+y*26+offset,fill_color,8)
+				end
+			end
+		end
+	end
+	
+	price_str="-"..items[item_x][item_y][2].."X"
+	if shoplifter then
+		draw_text("hEY! yOU DON'T\nHAVE ENOUGH COMBO!",3,111-sub_timer,0,7)
+	elseif murderer then
+		draw_text("hEY! yOU DON'T\nHAVE ENOUGH COMBO!\niF YOUR COMBO DROPS\nTO ZERO, YOU'LL KILL\nYOUR MOUSE FRIEND!",3,97-sub_timer,0,7)
+	elseif combo<=1000 then
+		n=0
+		if shop_times==0 then
+			shop_times=1
+		end
+		for i=1,#shop_lines[shop_times] do
+			if sub(shop_lines[shop_times],i,i)=='\n' then
+				n+=1
+			end
+		end
+		draw_text(shop_lines[shop_times],3,122-sub_timer-n*7,0,7)
+	else
+		draw_text("wAIT A MINUTE...\nyOU ACTUALLY\nHAVE ENOUGH!?",3,108-sub_timer,0,7)
+	end
+end
 
-function shop_menu()
-	if not btn(❎) then
-		almost_done=true
+function buy_thing()
+	combo-=items[item_x][item_y][2]
+	sfx(8)
+	bought=items[item_x][item_y][3]
+	
+	if item_x==1 and item_y==1 then
+		if homing_dash_unlocked then
+			homing_range+=bought
+		else
+			homing_dash_unlocked=true
+			homing_range=26
+			items_a[1]={"hOMING LOCK-ON",3,10,"PX"}
+			bought=0
+		end
+	elseif item_x==1 and item_y==2 then
+		hit_power+=bought*0.15
+	elseif item_x==1 and item_y==3 then
+		run_speed+=bought*0.167
+	elseif item_x==2 and item_y==1 then
+		lives+=bought
+	elseif item_x==2 and item_y==2 then
+		max_jumps+=bought
+	elseif item_x==2 and item_y==3 then
+		jump_height+=bought
+	elseif item_x==3 and item_y==1 then
+		combo_multiplier+=bought
+	elseif item_x==3 and item_y==2 then
+		combo_bonus+=bought
+	elseif item_x==3 and item_y==3 then
+		sfx(0,-2)
+		creen="winner"
 	end
 	
-	if btn(❎) and almost_done then
-		animate_out=true
-	end
-	
-	if shop_anim>1 and not animate_out then
-		shop_anim-=1
-	elseif animate_out then
-		shop_anim+=1
-		if shop_anim>=10 then
-			animate_out=false
-			almost_done=false
-			shopping=false
-			can_shop=false
+	if bought!=0 then
+		items[item_x][item_y][2]=flr(items[item_x][item_y][2]*1.5)
+		if (item_x==2 and item_y==1)
+		or (item_x==2 and item_y==2) then
+			bought=0
+		elseif (item_x==3 and item_y==1) or (item_x==3 and item_y==2) or (item_x==1 and item_y==2) then
+			items[item_x][item_y][2]=flr(items[item_x][item_y][2]*2)
+			items[item_x][item_y][3]=items[item_x][item_y][3]+1
+		else
+			items[item_x][item_y][3]=items[item_x][item_y][3]*1.25
 		end
 	end
 	
-	if shopping then
-		rectfill(0,104,128/shop_anim,128,0)
-		if btnp(➡️) then
-			item_pos+=1
-		elseif btnp(⬅️) then
-			item_pos-=1
-		end
-		
-		if item_pos<1 then
-			item_pos=#items
-		elseif item_pos>#items then
-			item_pos=1
-		end
-		
-		if shop_anim==1 then
-			str1=items[item_pos][1]
-			str2="+"..items[item_pos][3]..items[item_pos][4]
-			str3="cOST: "..items[item_pos][2].."X"
-			print(str1,64-#str1*2,107,7)
-			print(str2,64-#str2*2,113,7)
-			print(str3,64-#str3*2,119,7)
-		end
+	if item_x==3 and item_y==4 then
+		shop_timer_max+=300
+		sfx(0,-2)
+		switch_to_game()
 	end
 end
 -->8
@@ -468,7 +702,7 @@ function draw_target()
 			target_color+=1
 		end
 		if hit_timer<=0 and homing_dash_cooldown>=homing_dash_max_cooldown then
-				print("z",target_x-1,target_y-anim_counter-6,target_color%2+7)
+				print("x",target_x-1,target_y-anim_counter-6,target_color%2+7)
 				
 				circ(target_x,target_y,anim_counter,target_color%2+7)
 				circ(target_x,target_y,anim_counter-5,target_color%2+7)
@@ -484,12 +718,15 @@ end
 -->8
 --screen logic
 
-screen="game" //"title"
+screen="title"
 
 subtitles={"best friends","best buds","best of friends","bffs","best friends forever","enemies! (jk)","friendly to each other","cool dudes","one is a mouse","what are you waiting for?","start the game!"}
 subtitle_counter=75
+lives_timer=150
 
 function decide_screen()
+	subtitle_counter+=1
+	sub_timer=flr(subtitle_counter/37.5)%2
 	if screen=="title" then
 		title_loop()
 	elseif screen=="intro" then
@@ -497,15 +734,28 @@ function decide_screen()
 	elseif screen=="game" then
 		game_loop()
 	elseif screen=="shop" then
+		shop_loop()
+	elseif screen=="lives" then
+		lives_loop()
+	elseif screen=="gameover" then
+		gameover_loop()
+	elseif screen=="winner" then
+		cls(0)
 		
+		spr(9+5*sub_timer,52,96-sub_timer)
+		spr(1+22*sub_timer,72,96-sub_timer,1,1,true,true)
+		spr(2+22*sub_timer,64,96-sub_timer,1,1,true,true)
+	
+		draw_text("you did it!",64-#"you did it!"*2,38,7,13)
+		draw_text("you helped ninja keep",64-#"you helped ninja keep"*2,52,7,13)
+		draw_text("their mouse friend alive",64-#"their mouse friend alive"*2,59,7,13)
+		draw_text("long enough to lift the curse!",64-#"long enough to lift the curse!"*2,66,7,13)
+		draw_text("thanks for playing!",64-#"thanks for playing!"*2,80,7,13)
 	end
 end
 
 function title_loop()
 	draw_world()
-
-	subtitle_counter+=1
-	sub_timer=flr(subtitle_counter/37.5)%2
 	
 	if flr(subtitle_counter/75)<#subtitles then
 		draw_text(subtitles[flr(subtitle_counter/75)],64-#subtitles[flr(subtitle_counter/75)]*2,48-sub_timer,0,7)
@@ -515,19 +765,150 @@ function title_loop()
 	
 	draw_text("ninja and mouse",64-#"ninja and mouse"*2,40-sub_timer,0,7)
 	
-	draw_text("press z or x to start!",64-#"press x or c to start!"*2,64-sub_timer,0,7)
+	draw_text("press z",64-#"press z"*2,64-sub_timer,0,7)
 
 	spr(9+5*sub_timer,52,96-sub_timer)
 	spr(1+22*sub_timer,72,96-sub_timer,1,1,true,true)
 	spr(2+22*sub_timer,64,96-sub_timer,1,1,true,true)
 	
-	if btn(❎) or btn(🅾️) then
+	if btn(🅾️) then
 		screen="intro"
 	end
 end
 
 function intro_loop()
+	cls(0)
+	
+	draw_text("oh no!",64-#"oh no!"*2,18,7,13)
+	draw_text("ninja's mouse friend was",64-#"ninja's mouse friend was"*2,32,7,13)
+	draw_text("cursed by an evil witch!",64-#"cursed by an evil witch!"*2,39,7,13)
+	draw_text("the mouse friend will die",64-#"the mouse friend will die"*2,53,7,13)
+	draw_text("if they touch the ground!",64-#"if they touch the ground!"*2,60,7,13)
+	
+	draw_text("ninja has to combo the mouse",64-#"ninja has to combo the mouse"*2,74,7,13)
+	draw_text("friend enough times to earn",64-#"friend enough times to earn"*2,81,7,13)
+	draw_text("a cure from the combo store.",64-#"a cure from the combo store."*2,88,7,13)
+	
+	draw_text("press z to begin!",64-#"press z to begin!"*2,103,7,13)
+	
+	if btnp(🅾️) then
+		switch_to_game()
+	end
+end
+
+function switch_to_game()
+	item_x=1
+	item_y=1
+	about_to_shop=false
+	friend_x=81
+	friend_y=82.5
+	friend_delta_x=0
+	friend_delta_y=0
+	char_x=84
+	char_y=96
+	char_delta_x=0
+	char_delta_y=0
+	shop_counter=100
+	bounce_cycle=1
+	walk_cycle=0
+	walk_mod=1
+	hit_timer=0
+	bounces=0
+	float_mod=-1
+	shop_times=0
+	friend_floating=true
+	shop_timer=shop_timer_max
 	screen="game"
+end
+
+function gameover_loop()
+	cls(0)
+	draw_text("game over",64-#"game over"*2,38,7,13)
+	draw_text("you could not keep",64-#"you could not keep"*2,52,7,13)
+	draw_text("your mouse friend alive",64-#"your mouse friend alive"*2,59,7,13)
+	draw_text("press z to try again",64-#"press z to try again"*2,73,7,13)
+
+	if btnp(🅾️) and f>20 then
+		//do final variable pass at end
+		
+		combo_offset=0
+shop_timer=720
+shop_timer_max=720
+shop_counter=100
+about_to_shop=false
+		
+		char_x=84
+char_y=96
+char_delta_x=0
+char_delta_y=0
+flip_char=false
+bounce_cycle=1
+walk_cycle=0
+walk_mod=1
+homing_range=0
+homing_dash_max_cooldown=180
+homing_dash_cooldown=180
+homing_dashing=false
+homing_dash_frames=5
+homing_dash_unlocked=false
+dash_unlocked=false
+dash_max_cooldown=120
+dash_cooldown=120
+dashing=false
+dash_speed=0
+jumps=1
+max_jumps=1
+jump_delay=2
+combo=0
+run_speed=0
+jump_height=0
+shop_timer_decrease=60
+combo_multiplier=1
+combo_bonus=1
+
+friend_x=81
+friend_y=82.5
+friend_delta_x=0
+friend_delta_y=0
+friend_floating=true
+flip_friend=false
+hit_timer=0
+bounces=0
+float_mod=-1
+lives=1
+hit_power=0
+
+items_a={{"hOMING DASH",5,0,""},{"mOUSE WEIGHT",5,1,"OZ"},{"rUN sPEED",10,1,"PX/SEC"}}
+items_b={{"bONUS LIFE",30,1,"UP"},{"eXTRA JUMP",100,1,"JUMP"},{"jUMP HEIGHT",3,2,"PX"}}
+items_c={{"cOMBO mULTIPLIER",50,2,"X"},{"cOMBO BONUS",35,1,"X/HIT"},{"lIFT CURSE",500,0,""},{"lEAVE SHOP",0,0,""}}
+items={items_a,items_b,items_c}
+shop_lines={"pRESS z TO BUY\nSOMETHING, WILL YA?","i HEARD THAT THE MORE\nCOMBO YOU HAVE, THE\nFURTHER YOU'LL HIT\nYOUR MOUSE FRIEND..."}
+item_x=1
+item_y=1
+shop_times=1
+shoplifter=false
+murderer=false
+
+target_color=0
+anim_counter=20
+		
+		switch_to_game()
+	end
+end
+
+function lives_loop()
+	cls(0)
+	lives_timer-=1
+
+	draw_text("X "..lives,62,58,7,13)
+	
+	spr(1+22*sub_timer,64-20,56-sub_timer,1,1,false,true)
+	spr(2+22*sub_timer,72-20,56-sub_timer,1,1,false,true)
+	
+	if lives_timer<=0 then
+		lives_timer=150
+		switch_to_game()
+	end
 end
 __gfx__
 00000000000e0e00e00e0000111111111111111111111111bbbbbbbb00000000008888800cc66cc00cc66cc00cc66cc00cc66cc00cc66cc00cc66cc000000000
@@ -546,14 +927,14 @@ __gfx__
 77777777777777770777770007777770007777777777777707777700000d00dddddddd0000000000000000000000000000000000000000000000000000000000
 77777770007777700077700000000000000000000000000000000000000000ded00ded0000000000000000000000000000000000000000000000000000000000
 00000000000077700000000000000000000000000000000000000000000000ddd00ddd0000000000000000000000000000000000000000000000000000000000
-0099990000999900099999000990099009999990009999900999990000999900009999000099990000aaaa000000000000000000000000000000000000000000
-09999900099999900999999009900990099999900999999009999990099999900990099009999990aaa99aaa0000000000000000000000000000000000000000
-09999900099009900999999009900990099000000990000009999990099009900990099009900990a999999a0000000000000000000000000000000000000000
-00099900099009900000999009900990099000000990000000009990099009900990099009900990aaaaaaaa0000000000000000000000000000000000000000
-00099900000009900000999009900990099000000990000000009990099009900990099009900990000000000000000000000000000000000000000000000000
-00099900000009900000999009900990099000000990000000009990099009900990099009900990000000000000000000000000000000000000000000000000
-00099900000009900000999009900990099000000990000000009990099009900990099009900990000000000000000000000000000000000000000000000000
-00099900099999900999999009999990099999000999990000009990009999000999999009900990000000000000000000000000000000000000000000000000
+0099990000999900099999000990099009999990009999900999990000999900009999000099990000aaaa000aaa000000000000000000000000000000000000
+09999900099999900999999009900990099999900999999009999990099999900990099009999990aaa99aaa0a9a000000000000000000000000000000000000
+09999900099009900999999009900990099000000990000009999990099009900990099009900990a999999aaa9a000000000000000000000000000000000000
+00099900099009900000999009900990099000000990000000009990099009900990099009900990aaaaaaaaa99a000000000000000000000000000000000000
+0009990000000990000099900990099009900000099000000000999009900990099009900990099000000000a99a000000000000000000000000000000000000
+0009990000000990000099900990099009900000099000000000999009900990099009900990099000000000aa9a000000000000000000000000000000000000
+00099900000009900000999009900990099000000990000000009990099009900990099009900990000000000a9a000000000000000000000000000000000000
+00099900099999900999999009999990099999000999990000009990009999000999999009900990000000000aaa000000000000000000000000000000000000
 00099900099999900999999009999990099999900999999000009990009999000099999009900990900000090000000000000000000000000000000000000000
 00099900099000000000999000000990099999900990099000009990099009900000099009900990990000990000000000000000000000000000000000000000
 00099900099000000000999000000990000099900990099000009990099009900000099009900990099009900000000000000000000000000000000000000000
@@ -709,13 +1090,15 @@ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 __sfx__
-01100010000000000026633000000c333000000c333000000c3330c3331a633000001a6331a633000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01100010000000000026623000000c323000000c323000000c3230c3231a623000001a6231a623000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 011000002703100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-010200000d1400f1400d1400f1400d1400f1400d1400f1400d1400f1400d1400f1400d1400f1400d1400f14000000000000000000000000000000000000000000000000000000000000000000000000000000000
+010400000d1200f1200d1200f1200d1200f1200d1200f1200d1000f1000d1000f1000d1000f1000d1000f10000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0105000019542195421b5421b5421d5421d5420000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0103000028030290302b0303404035040370403704537045000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0103000028020290202b0203403035030370303703537035000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0101000011623116233d510000000000000000000003d510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-011000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01140000275402754000000000000000000000000000000027500275000000000000000000000000000000002b5002b5002b50000000000000000000000000000000000000000000000000000000000000000000
+011400002b5402b5402b5400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01050000190201b020240250000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __music__
 00 01024344
 
