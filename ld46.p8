@@ -67,10 +67,6 @@ function game_loop()
 	
 	if shop_counter<=0 then
 		screen="shop"
-		shop_times+=1
-		if shop_times>#shop_lines then
-			shop_times=0
-		end
 		sfx(0)
 	end
 	
@@ -157,7 +153,7 @@ bounce_cycle=1
 walk_cycle=0
 walk_mod=1
 homing_range=0
-homing_dash_max_cooldown=180
+homing_dash_max_cooldown=720
 homing_dash_cooldown=180
 homing_dashing=false
 homing_dash_frames=5
@@ -221,10 +217,21 @@ function move_char()
 		flip_char=false
 	end
 	
+	homing_dash_cooldown+=1
+	
 	if homing_dash_cooldown<homing_dash_max_cooldown then
-		homing_dash_cooldown+=1
-		if homing_dash_cooldown==homing_dash_max_cooldown and hit_timer==0 then
+		if homing_dash_unlocked and homing_dash_cooldown==homing_dash_max_cooldown and hit_timer==0 then
 			sfx(3)
+		end
+	end
+	
+	if homing_dash_unlocked then
+		if homing_dash_cooldown>=homing_dash_max_cooldown then
+			draw_text("homing dash",64-#"homing dash"*2,108,0,7)
+			draw_text("ready!",64-#"ready!"*2,114,0,7)
+			draw_text("(press x)",64-#"(press x)"*2,120,0,7)
+		else
+			draw_text("homing dash\nready in "..flr((homing_dash_max_cooldown-homing_dash_cooldown)/60),44,110,0,7)
 		end
 	end
 	
@@ -340,6 +347,7 @@ bounces=0
 float_mod=-1
 lives=1
 hit_power=0
+gave_tip=false
 
 function float_friend()
 	line(60-char_x+friend_x+2,friend_y+96-char_y-12,64-char_x+friend_x,friend_y+96-char_y,7)
@@ -400,6 +408,7 @@ function move_friend()
 	friend_y+=friend_delta_y
 	
 	if friend_y>=96 then
+		sfx(9)
 		if lives>1 then
 			lives-=1
 			screen="lives"
@@ -466,6 +475,12 @@ function hit_friend()
 		end
 		draw_text("SQUEAK!",56-char_x+friend_x,friend_y+96-char_y-6,2,13)
 		hit_timer-=1
+	elseif combo==1 and not gave_tip then
+		draw_text("KEEP JUMPING\nINTO ME, NINJA!",56-char_x+friend_x+4-#"KEEP JUMPING\nINTO ME, NINJA!"*2+36,friend_y+96-char_y-14,2,13)
+	end
+	
+	if combo==2 then
+		gave_tip=true
 	end
 end
 -->8
@@ -488,11 +503,10 @@ end
 -->8
 --shop logic
 
-items_a={{"hOMING DASH",5,0,""},{"mOUSE WEIGHT",5,1,"OZ"},{"rUN sPEED",10,1,"PX/SEC"}}
-items_b={{"bONUS LIFE",20,1,"UP"},{"eXTRA JUMP",40,1,"JUMP"},{"jUMP HEIGHT",3,2,"PX"}}
-items_c={{"cOMBO mULTIPLIER",20,2,"X"},{"cOMBO BONUS",25,1,"X/HIT"},{"lIFT CURSE",300,0,""},{"lEAVE SHOP",0,0,""}}
+items_a={{"hOMING DASH",5,0,"","tHAT'S THE HOMING DASH.\nIT'LL LET YA\nAUTOMATICALLY DASH TO\nYOUR MOUSE FRIEND IF\nYOU PRESS x.\niT'S ON SALE TOO!"},{"mOUSE WEIGHT",5,1,"OZ","tHAT'LL MAKE YOUR MOUSE\nFRIEND LIGHTER, MEANING\nTHEY'LL FLY FURTHER\nWHEN YA HIT EM."},{"rUN sPEED",10,1,"PX/SEC","tHAT'LL MAKE YA RUN\nFASTER. 'NUFF SAID."}}
+items_b={{"bONUS LIFE",10,1,"UP","tHAT'S A BONUS LIFE.\niT'LL GIVE YA ANOTHER\nCHANCE IF YOUR MOUSE\nFRIEND HITS THE GROUND."},{"eXTRA JUMP",40,1,"JUMP","tHAT'LL LET YA JUMP\nAGAIN IN THE AIR. A\nDOUBLE JUMP? MAYBE\nEVEN A TRIPLE JUMP!"},{"jUMP HEIGHT",3,2,"PX","tHAT'LL MAKE YA\nJUMP HIGHER!"}}
+items_c={{"cOMBO mULTIPLIER",20,2,"X","tHAT'LL MULTIPLY YOUR\nCOMBO WHEN YA HIT YOUR\nMOUSE FRIEND. a\nLONG-TERM INVESTMENT,\nAS IT WERE."},{"cOMBO BONUS",25,1,"X/HIT","tHAT'LL ADD TO YOUR\nCOMBO WHENEVER YA HIT\nYOUR MOUSE FRIEND.\naNOTHER INVESTMENT,\nPERHAPS?"},{"lIFT CURSE",100,0,"","tHAT'LL LIFT THE CURSE\nFROM YOUR MOUSE FRIEND.\ni WISH i COULD GIVE IT\nTO YA, i REALLY DO.\nbLAME CAPITALISM."},{"lEAVE SHOP",0,0,"","tHAT'S THE EXIT DOOR.\ngOOD LUCK OUT THERE!"}}
 items={items_a,items_b,items_c}
-shop_lines={"pRESS z TO BUY\nSOMETHING, WILL YA?","i HEARD THAT THE MORE\nCOMBO YOU HAVE, THE\nFURTHER YOU'LL HIT\nYOUR MOUSE FRIEND..."}
 item_x=1
 item_y=1
 shop_times=0
@@ -502,6 +516,7 @@ murderer=false
 function shop_loop()
 	cls(4)
 	draw_combo()
+	draw_text("pRESS z TO BUY SOMETHING",64-#"pRESS z TO BUY SOMETHING"*2,2,9,10)
 	if btnp(➡️) then
 		if item_y!=4 then
 			item_x+=1
@@ -573,6 +588,9 @@ function shop_loop()
 			if x==3 and y==4 then
 				draw_text("free!",22-#"free!"*2+(x-1)*42,-8+y*26+offset,fill_color,11)
 			end
+			if x==1 and y==1 and not homing_dash_unlocked then
+				draw_text("on sale!",22-#"on sale!"*2+(x-1)*42,-4+y*26+offset,fill_color,11)
+			end
 			lines={}
 			last_space=0
 			for i=1,#items[x][y][1] do
@@ -603,7 +621,7 @@ function shop_loop()
 			if (x!=3 or y!=4) then
 				if x!=3 or y!=3 then
 					if (x==1 and y==1 and not homing_dash_unlocked) then
-						draw_text(str2,22-#str2*2+(x-1)*42,-4+y*26+offset,fill_color,8)
+						draw_text(str2,22-#str2*2+(x-1)*42,-4+y*26+offset+6,fill_color,8)
 					else
 						draw_text(str2,22-#str2*2+(x-1)*42,2+y*26+offset,fill_color,8)
 						draw_text(str3,22-#str3*2+(x-1)*42,-4+y*26+offset,fill_color,11)
@@ -625,12 +643,12 @@ function shop_loop()
 		if shop_times==0 then
 			shop_times=1
 		end
-		for i=1,#shop_lines[shop_times] do
-			if sub(shop_lines[shop_times],i,i)=='\n' then
+		for i=1,#items[item_x][item_y][5] do
+			if sub(items[item_x][item_y][5],i,i)=='\n' then
 				n+=1
 			end
 		end
-		draw_text(shop_lines[shop_times],3,122-sub_timer-n*7,0,7)
+		draw_text(items[item_x][item_y][5],3,122-sub_timer-n*7,0,7)
 	else
 		draw_text("wAIT A MINUTE...\nyOU ACTUALLY\nHAVE ENOUGH!?",3,108-sub_timer,0,7)
 	end
@@ -647,7 +665,7 @@ function buy_thing()
 		else
 			homing_dash_unlocked=true
 			homing_range=26
-			items_a[1]={"hOMING LOCK-ON",3,10,"PX"}
+			items_a[1]={"hOMING LOCK-ON",3,10,"PX","tHAT'LL INCREASE YOUR\nHOMING DASH'S LOCK-ON\nRANGE. PRETTY USEFUL!"}
 			bought=0
 		end
 	elseif item_x==1 and item_y==2 then
@@ -666,7 +684,7 @@ function buy_thing()
 		combo_bonus+=bought
 	elseif item_x==3 and item_y==3 then
 		sfx(0,-2)
-		creen="winner"
+		screen="winner"
 	end
 	
 	if bought!=0 then
@@ -819,6 +837,7 @@ function switch_to_game()
 	friend_floating=true
 	shop_timer=shop_timer_max
 	screen="game"
+	homing_dash_cooldown=homing_dash_max_cooldown
 end
 
 function gameover_loop()
@@ -829,69 +848,67 @@ function gameover_loop()
 	draw_text("press z to try again",64-#"press z to try again"*2,73,7,13)
 
 	if btnp(🅾️) and f>20 then
-		//do final variable pass at end
-		
 		combo_offset=0
-shop_timer=720
-shop_timer_max=720
-shop_counter=100
-about_to_shop=false
-		
+		shop_timer=720
+		shop_timer_max=720
+		shop_counter=100
+		about_to_shop=false
+
 		char_x=84
-char_y=96
-char_delta_x=0
-char_delta_y=0
-flip_char=false
-bounce_cycle=1
-walk_cycle=0
-walk_mod=1
-homing_range=0
-homing_dash_max_cooldown=180
-homing_dash_cooldown=180
-homing_dashing=false
-homing_dash_frames=5
-homing_dash_unlocked=false
-dash_unlocked=false
-dash_max_cooldown=120
-dash_cooldown=120
-dashing=false
-dash_speed=0
-jumps=1
-max_jumps=1
-jump_delay=2
-combo=0
-run_speed=0
-jump_height=0
-shop_timer_decrease=60
-combo_multiplier=1
-combo_bonus=1
-
-friend_x=81
-friend_y=82.5
-friend_delta_x=0
-friend_delta_y=0
-friend_floating=true
-flip_friend=false
-hit_timer=0
-bounces=0
-float_mod=-1
-lives=1
-hit_power=0
-
-items_a={{"hOMING DASH",5,0,""},{"mOUSE WEIGHT",5,1,"OZ"},{"rUN sPEED",10,1,"PX/SEC"}}
-items_b={{"bONUS LIFE",30,1,"UP"},{"eXTRA JUMP",100,1,"JUMP"},{"jUMP HEIGHT",3,2,"PX"}}
-items_c={{"cOMBO mULTIPLIER",50,2,"X"},{"cOMBO BONUS",35,1,"X/HIT"},{"lIFT CURSE",500,0,""},{"lEAVE SHOP",0,0,""}}
-items={items_a,items_b,items_c}
-shop_lines={"pRESS z TO BUY\nSOMETHING, WILL YA?","i HEARD THAT THE MORE\nCOMBO YOU HAVE, THE\nFURTHER YOU'LL HIT\nYOUR MOUSE FRIEND..."}
-item_x=1
-item_y=1
-shop_times=1
-shoplifter=false
-murderer=false
-
-target_color=0
-anim_counter=20
+		char_y=96
+		char_delta_x=0
+		char_delta_y=0
+		flip_char=false
+		bounce_cycle=1
+		walk_cycle=0
+		walk_mod=1
+		homing_range=0
+		homing_dash_max_cooldown=720
+		homing_dash_cooldown=180
+		homing_dashing=false
+		homing_dash_frames=5
+		homing_dash_unlocked=false
+		dash_unlocked=false
+		dash_max_cooldown=120
+		dash_cooldown=120
+		dashing=false
+		dash_speed=0
+		jumps=1
+		max_jumps=1
+		jump_delay=2
+		combo=0
+		run_speed=0
+		jump_height=0
+		shop_timer_decrease=60
+		combo_multiplier=1
+		combo_bonus=1
 		
+		friend_x=81
+		friend_y=82.5
+		friend_delta_x=0
+		friend_delta_y=0
+		friend_floating=true
+		flip_friend=false
+		hit_timer=0
+		bounces=0
+		float_mod=-1
+		lives=1
+		hit_power=0
+		gave_tip=false
+		
+		items_a={{"hOMING DASH",5,0,"","tHAT'S THE HOMING DASH.\nIT'LL LET YA\nAUTOMATICALLY DASH TO\nYOUR MOUSE FRIEND IF\nYOU PRESS x.\niT'S ON SALE TOO!"},{"mOUSE WEIGHT",5,1,"OZ","tHAT'LL MAKE YOUR MOUSE\nFRIEND LIGHTER, MEANING\nTHEY'LL FLY FURTHER\nWHEN YA HIT EM."},{"rUN sPEED",10,1,"PX/SEC","tHAT'LL MAKE YA RUN\nFASTER. 'NUFF SAID."}}
+		items_b={{"bONUS LIFE",10,1,"UP","tHAT'S A BONUS LIFE.\niT'LL GIVE YA ANOTHER\nCHANCE IF YOUR MOUSE\nFRIEND HITS THE GROUND."},{"eXTRA JUMP",40,1,"JUMP","tHAT'LL LET YA JUMP\nAGAIN IN THE AIR. A\nDOUBLE JUMP? MAYBE\nEVEN A TRIPLE JUMP!"},{"jUMP HEIGHT",3,2,"PX","tHAT'LL MAKE YA\nJUMP HIGHER!"}}
+		items_c={{"cOMBO mULTIPLIER",20,2,"X","tHAT'LL MULTIPLY YOUR\nCOMBO WHEN YA HIT YOUR\nMOUSE FRIEND. a\nLONG-TERM INVESTMENT,\nAS IT WERE."},{"cOMBO BONUS",25,1,"X/HIT","tHAT'LL ADD TO YOUR\nCOMBO WHENEVER YA HIT\nYOUR MOUSE FRIEND.\naNOTHER INVESTMENT,\nPERHAPS?"},{"lIFT CURSE",100,0,"","tHAT'LL LIFT THE CURSE\nFROM YOUR MOUSE FRIEND.\ni WISH i COULD GIVE IT\nTO YA, i REALLY DO.\nbLAME CAPITALISM."},{"lEAVE SHOP",0,0,"","tHAT'S THE EXIT DOOR.\ngOOD LUCK OUT THERE!"}}
+		items={items_a,items_b,items_c}
+		item_x=1
+		item_y=1
+		shop_times=0
+		shoplifter=false
+		murderer=false
+		
+		target_color=0
+		anim_counter=20
+
 		switch_to_game()
 	end
 end
@@ -1099,6 +1116,7 @@ __sfx__
 01140000275402754000000000000000000000000000000027500275000000000000000000000000000000002b5002b5002b50000000000000000000000000000000000000000000000000000000000000000000
 011400002b5402b5402b5400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01050000190201b020240250000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+010600000d61300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __music__
 00 01024344
 
