@@ -40,6 +40,16 @@ about_to_shop=false
 function game_loop()
 	draw_world()
 	
+	if homing_dash_unlocked then
+		if homing_dash_cooldown>=homing_dash_max_cooldown then
+			draw_text("homing dash",64-#"homing dash"*2,108,0,7)
+			draw_text("ready!",64-#"ready!"*2,114,0,7)
+			draw_text("(press x)",64-#"(press x)"*2,120,0,7)
+		else
+			draw_text("homing dash\nready in "..flr((homing_dash_max_cooldown-homing_dash_cooldown)/60),44,110,0,7)
+		end
+	end
+	
 	if about_to_shop then
 		shop_counter-=1
 	else
@@ -101,14 +111,6 @@ function game_loop()
 	draw_target()
 
 	draw_combo()
-	
-	--[[if go_timer>=0 and not starting then
-		if go_timer==30 then
-			sfx(7)
-			friend_delta_y=0.5
-		end
-		draw_text("go!",60,62,0,7)
-	end]]--
 end
 
 function draw_text(s,x,y,c1,c2)
@@ -225,16 +227,6 @@ function move_char()
 		end
 	end
 	
-	if homing_dash_unlocked then
-		if homing_dash_cooldown>=homing_dash_max_cooldown then
-			draw_text("homing dash",64-#"homing dash"*2,108,0,7)
-			draw_text("ready!",64-#"ready!"*2,114,0,7)
-			draw_text("(press x)",64-#"(press x)"*2,120,0,7)
-		else
-			draw_text("homing dash\nready in "..flr((homing_dash_max_cooldown-homing_dash_cooldown)/60),44,110,0,7)
-		end
-	end
-	
 	if dash_cooldown<dash_max_cooldown then
 		dash_cooldown+=1
 	end
@@ -320,7 +312,6 @@ function dash()
 end
 
 function jump()
-	print(jump_height,2,2,11)
 	char_y-=jump_height
 	char_delta_y=-1.95
 	jump_delay=2
@@ -447,7 +438,7 @@ function hit_friend()
 			char_delta_x=0
 			char_delta_y=0.2
 			hit_timer=24
-			combo+=1
+			combo+=combo_bonus*combo_multiplier
 			combo_offset+=2
 			homing_dashing=false
 			bounces=0
@@ -679,9 +670,9 @@ function buy_thing()
 	elseif item_x==2 and item_y==3 then
 		jump_height+=bought
 	elseif item_x==3 and item_y==1 then
-		combo_multiplier+=bought
+		combo_multiplier+=1
 	elseif item_x==3 and item_y==2 then
-		combo_bonus+=bought
+		combo_bonus+=1
 	elseif item_x==3 and item_y==3 then
 		sfx(0,-2)
 		screen="winner"
